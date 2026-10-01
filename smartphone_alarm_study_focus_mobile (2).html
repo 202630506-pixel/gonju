@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ko" class="h-full select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>스마트폰 경보기 | Study Focus Mobile Pro</title>
+  
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            appbg: '#080c14',
+            cardbg: '#111827',
+            danger: '#ff3b30',
+            success: '#10b981',
+            warning: '#f59e0b'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* iOS & Android Safe Area Padding */
+    .safe-top { padding-top: env(safe-area-inset-top, 16px); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+
+    /* Theme Design Tokens */
+    :root {
+      --theme-primary: #38bdf8;
+      --theme-primary-rgb: 56, 189, 248;
+      --theme-glow: rgba(56, 189, 248, 0.25);
+      --theme-bg-accent: #0f172a;
+    }
+
+    [data-theme="cyber"] {
+      --theme-primary: #38bdf8;
+      --theme-primary-rgb: 56, 189, 248;
+      --theme-glow: rgba(56, 189, 248, 0.3);
+      --theme-bg-accent: #0b1329;
+    }
+
+    [data-theme="emerald"] {
+      --theme-primary: #10b981;
+      --theme-primary-rgb: 16, 185, 129;
+      --theme-glow: rgba(16, 185, 129, 0.3);
+      --theme-bg-accent: #062016;
+    }
+
+    [data-theme="purple"] {
+      --theme-primary: #a855f7;
+      --theme-primary-rgb: 168, 85, 247;
+      --theme-glow: rgba(168, 85, 247, 0.3);
+      --theme-bg-accent: #19092b;
+    }
+
+    [data-theme="sunset"] {
+      --theme-primary: #f97316;
+      --theme-primary-rgb: 249, 115, 22;
+      --theme-glow: rgba(249, 115, 22, 0.3);
+      --theme-bg-accent: #240e06;
+    }
+
+    [data-theme="oled"] {
+      --theme-primary: #e2e8f0;
+      --theme-primary-rgb: 226, 232, 240;
+      --theme-glow: rgba(255, 255, 255, 0.15);
+      --theme-bg-accent: #000000;
+    }
+
+    .theme-color-text { color: var(--theme-primary); }
+    .theme-bg-main { background-color: var(--theme-primary); }
+    .theme-border { border-color: var(--theme-primary); }
+    .theme-glow-shadow { box-shadow: 0 10px 25px -5px var(--theme-glow); }
+
+    /* Strobe Effect on Overtime */
+    @keyframes siren-strobe {
+      0%, 100% {
+        box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.3);
+        background-color: #0d0506;
+      }
+      50% {
+        box-shadow: inset 0 0 160px rgba(255, 59, 48, 0.9);
+        background-color: #2b080a;
+      }
+    }
+
+    body.alarm-active {
+      animation: siren-strobe 0.5s infinite ease-in-out;
+    }
+
+    @keyframes siren-bounce {
+      0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 10px rgba(255, 59, 48, 0.8)); }
+      25% { transform: scale(1.2) rotate(-8deg); }
+      75% { transform: scale(1.2) rotate(8deg); }
+    }
+
+    .siren-anim {
+      animation: siren-bounce 0.5s infinite ease-in-out;
+    }
+
+    /* Glassmorphism Panel */
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Shutdown Blur & Lock Screen Overlay */
+    .shutdown-blur {
+      backdrop-filter: blur(28px) brightness(0.3) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) brightness(0.3) saturate(180%);
+    }
+
+    /* Interactive Feedback */
+    .touch-active:active {
+      transform: scale(0.95);
+      opacity: 0.9;
+    }
+
+    /* Scrollbar hide */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body data-theme="cyber" class="bg-appbg text-slate-100 h-full w-full flex justify-center items-center overflow-hidden font-sans">
+
+  <!-- Main Mobile Device Wrapper -->
+  <div id="main-app-container" class="w-full max-w-[430px] h-full flex flex-col justify-between relative overflow-hidden bg-appbg safe-top safe-bottom transition-all duration-500">
+    
+    <!-- Dynamic Ambient Background Glow -->
+    <div id="ambient-glow" class="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style="background-color: var(--theme-glow);"></div>
+    <div id="danger-glow" class="hidden absolute top-0 inset-x-0 h-full bg-red-600/30 blur-3xl pointer-events-none z-10"></div>
+
+    <!-- Mobile Header -->
+    <header id="app-header" class="px-5 pt-3 pb-2 flex justify-between items-center z-20">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center font-bold text-sm theme-color-text">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-extrabold text-white tracking-tight leading-none">스마트폰 경보기</h1>
+          <p class="text-[10px] text-slate-400 font-semibold tracking-wider mt-0.5">STUDY FOCUS PRO</p>
+        </div>
+      </div>
+
+      <!-- Header Controls: Sound Test & Theme Switch Button -->
+      <div class="flex items-center gap-2">
+        <button onclick="toggleAudioTest()" id="test-sound-btn" 
+          class="touch-active bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700/80 flex items-center gap-1.5">
+          <i id="test-sound-icon" class="fa-solid fa-volume-high theme-color-text"></i>
+          <span id="test-sound-text" class="hidden sm:inline">테스트</span>
+        </button>
+
+        <button onclick="openThemeSelector()" 
+          class="touch-active bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 p-2 rounded-xl text-xs font-semibold border border-slate-700/80 flex items-center justify-center">
+          <i class="fa-solid fa-palette theme-color-text text-sm"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ④ Overuse Siren Badge -->
+    <div id="siren-badge" class="hidden z-20 px-5 py-1">
+      <div class="bg-red-500/20 border border-red-500/50 rounded-2xl p-2.5 flex items-center justify-center gap-3 backdrop-blur-md">
+        <div class="text-red-500 text-2xl siren-anim">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="text-left">
+          <p class="text-xs font-black text-red-400">심각한 시간 초과 발생!</p>
+          <p class="text-[10px] text-slate-300 font-medium">모든 기능이 제한됩니다. 즉시 스마트폰을 종료하세요!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timer Ring Section -->
+    <main class="flex-1 flex flex-col items-center justify-center px-6 my-1 relative z-20">
+      
+      <!-- Circular Progress Ring -->
+      <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center my-auto">
+        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="86" class="stroke-slate-800/80" stroke-width="10" fill="none" />
+          <circle id="progress-circle" cx="100" cy="100" r="86" 
+            class="transition-all duration-300 ease-linear" 
+            style="stroke: var(--theme-primary);"
+            stroke-width="10" 
+            stroke-linecap="round" 
+            fill="none" 
+            stroke-dasharray="540.35" 
+            stroke-dashoffset="0" />
+        </svg>
+        
+        <!-- Timer Labels -->
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span id="status-badge" class="text-[11px] font-bold text-slate-300 bg-slate-800/80 border border-slate-700 px-3 py-0.5 rounded-full mb-1">
+            측정 대기 중
+          </span>
+          <span id="time-display" class="text-5xl font-extrabold tracking-tight font-mono text-white my-1">00:00</span>
+          <div class="flex items-center gap-1.5 text-slate-400 text-xs font-semibold mt-0.5">
+            <span>목표 제한:</span>
+            <span id="goal-display-text" class="text-slate-100 font-bold">30분</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Preset Chips -->
+      <div id="preset-container" class="w-full mt-2 transition-all duration-300">
+        <p class="text-[11px] text-slate-400 font-semibold text-center mb-2">목표 시간 빠른 설정</p>
+        <div class="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <button onclick="setPresetTime(15)" class="preset-chip touch-active px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-bold text-slate-300 hover:border-slate-500">15분</button>
+          <button onclick="setPresetTime(30)" class="preset-chip touch-active px-3.5 py-1.5 rounded-xl border text-xs font-bold theme-border theme-color-text bg-slate-800/90">30분</button>
+          <button onclick="setPresetTime(60)" class="preset-chip touch-active px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-bold text-slate-300 hover:border-slate-500">60분</button>
+          <button onclick="setPresetTime(90)" class="preset-chip touch-active px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-bold text-slate-300 hover:border-slate-500">90분</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Control Sheet -->
+    <footer id="app-footer" class="px-5 pt-3.5 pb-4 glass-panel rounded-t-3xl border-t border-slate-800 relative z-20 transition-all duration-300">
+      
+      <!-- Stepper Box -->
+      <div id="custom-time-box" class="flex items-center justify-between bg-slate-900/90 rounded-2xl px-4 py-2 mb-3 border border-slate-800">
+        <span class="text-xs font-bold text-slate-300 flex items-center gap-2">
+          <i class="fa-solid fa-clock theme-color-text"></i> 시간 직접 입력
+        </span>
+        <div class="flex items-center gap-2.5">
+          <button onclick="adjustTime(-5)" class="touch-active w-7 h-7 rounded-lg bg-slate-800 text-slate-200 font-extrabold flex items-center justify-center border border-slate-700/80">-</button>
+          <div class="flex items-center gap-0.5">
+            <input type="number" id="limit-time" value="30" min="1" max="300" readonly
+              class="bg-transparent text-center font-black text-lg w-10 outline-none theme-color-text">
+            <span class="text-xs text-slate-400 font-bold">분</span>
+          </div>
+          <button onclick="adjustTime(5)" class="touch-active w-7 h-7 rounded-lg bg-slate-800 text-slate-200 font-extrabold flex items-center justify-center border border-slate-700/80">+</button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-2.5">
+        <button id="start-btn" onclick="startFocus()" 
+          class="touch-active flex-1 text-slate-950 font-black py-3.5 px-4 rounded-2xl text-base flex items-center justify-center gap-2 theme-bg-main theme-glow-shadow">
+          <i class="fa-solid fa-play text-sm"></i>
+          <span>측정 시작</span>
+        </button>
+        
+        <button id="stop-btn" onclick="stopFocus()" disabled 
+          class="touch-active flex-1 bg-slate-800/90 text-slate-500 font-black py-3.5 px-4 rounded-2xl border border-slate-700/50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base">
+          <i class="fa-solid fa-square text-sm"></i>
+          <span>종료 및 결과</span>
+        </button>
+      </div>
+    </footer>
+
+    <!-- SHUTDOWN & BLUR SCREEN OVERLAY (Activated on Overtime) -->
+    <div id="shutdown-overlay" class="hidden absolute inset-0 z-50 shutdown-blur bg-red-950/80 flex flex-col justify-between items-center p-6 text-center animate-fade-in">
+      <div class="my-auto flex flex-col items-center">
+        <!-- Flashing Emergency Icon -->
+        <div class="w-24 h-24 rounded-full bg-red-600/30 border-2 border-red-500 flex items-center justify-center text-red-500 text-5xl mb-6 siren-anim">
+          <i class="fa-solid fa-ban"></i>
+        </div>
+
+        <span class="bg-red-600/40 border border-red-500/60 text-red-300 text-xs font-black px-4 py-1 rounded-full uppercase tracking-widest mb-3 animate-pulse">
+          Critical Shutdown Mode
+        </span>
+
+        <h2 class="text-2xl font-black text-white leading-tight mb-2">
+          모든 기능이 셧다운 되었습니다!
+        </h2>
+        <p class="text-sm text-red-200/90 max-w-xs font-semibold leading-relaxed mb-8">
+          제한한 시간을 초과하셨습니다.<br>
+          스마트폰 화면을 끄고 즉시 몰입을 재개하세요!
+        </p>
+
+        <!-- Overtime Counter Display -->
+        <div class="bg-black/60 border border-red-500/40 rounded-2xl px-6 py-3 mb-8">
+          <p class="text-[11px] text-slate-400 font-bold mb-0.5">경과 초과 시간</p>
+          <span id="shutdown-timer" class="text-3xl font-black text-red-400 font-mono">00:00</span>
+        </div>
+
+        <!-- Emergency Unlock / Stop Button -->
+        <button onclick="emergencyUnlockAndStop()" 
+          class="touch-active bg-red-600 hover:bg-red-500 text-white font-black py-4 px-8 rounded-2xl text-base border border-red-400/50 shadow-xl shadow-red-900/50 flex items-center gap-2.5">
+          <i class="fa-solid fa-lock-open text-sm"></i>
+          <span>사용 중단 및 잠금 해제</span>
+        </button>
+      </div>
+
+      <p class="text-[11px] text-red-300/60 font-medium">
+        🚨 이 화면을 벗어나려면 위 사용 중단 버튼을 눌러야 합니다.
+      </p>
+    </div>
+
+    <!-- ② 30-Minute Interval Alert Bottom Sheet Modal -->
+    <div id="notify-modal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md z-40 flex items-end justify-center">
+      <div class="w-full glass-panel rounded-t-3xl p-6 border-t border-slate-700 text-center">
+        <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-3 text-xl border border-amber-500/30">
+          <i class="fa-solid fa-hourglass-start"></i>
+        </div>
+        <h3 class="text-lg font-extrabold text-white mb-1">스마트폰 사용 30분 경과</h3>
+        <p id="modal-desc" class="text-xs text-slate-300 mb-5 leading-relaxed">
+          현재 스마트폰을 30분 동안 사용 중입니다. 목표 시간을 확인하고 공부에 몰입하세요!
+        </p>
+        <button onclick="closeModal()" 
+          class="touch-active w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-3.5 px-6 rounded-2xl text-sm">
+          확인했습니다 (측정 계속)
+        </button>
+      </div>
+    </div>
+
+    <!-- Theme Color Picker Drawer Sheet -->
+    <div id="theme-modal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md z-40 flex items-end justify-center">
+      <div class="w-full glass-panel rounded-t-3xl p-6 border-t border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+            <i class="fa-solid fa-palette theme-color-text"></i> 스터디 테마 색상 선택
+          </h3>
+          <button onclick="closeThemeSelector()" class="text-slate-400 hover:text-white text-lg px-2">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Theme Options Grid -->
+        <div class="grid grid-cols-2 gap-2.5 mb-2">
+          <button onclick="applyTheme('cyber')" class="touch-active p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2.5 text-xs font-bold text-slate-200 text-left">
+            <span class="w-4 h-4 rounded-full bg-sky-400 inline-block"></span>
+            <span>사이버 네온 (블루)</span>
+          </button>
+          <button onclick="applyTheme('emerald')" class="touch-active p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2.5 text-xs font-bold text-slate-200 text-left">
+            <span class="w-4 h-4 rounded-full bg-emerald-500 inline-block"></span>
+            <span>에메랄드 포커스</span>
+          </button>
+          <button onclick="applyTheme('purple')" class="touch-active p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2.5 text-xs font-bold text-slate-200 text-left">
+            <span class="w-4 h-4 rounded-full bg-purple-500 inline-block"></span>
+            <span>퍼플 바이올렛</span>
+          </button>
+          <button onclick="applyTheme('sunset')" class="touch-active p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2.5 text-xs font-bold text-slate-200 text-left">
+            <span class="w-4 h-4 rounded-full bg-orange-500 inline-block"></span>
+            <span>웜 선셋</span>
+          </button>
+          <button onclick="applyTheme('oled')" class="touch-active p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2.5 text-xs font-bold text-slate-200 text-left col-span-2">
+            <span class="w-4 h-4 rounded-full bg-slate-200 inline-block"></span>
+            <span>OLED 카본 (모노크롬)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* Global App State */
+    let secondsElapsed = 0;
+    let timerInterval = null;
+    let isRunning = false;
+    let isShutdownActive = false;
+
+    const circleRadius = 86;
+    const circumference = 2 * Math.PI * circleRadius;
+
+    /* Web Audio API Engine */
+    let audioCtx = null;
+    let sirenOscillator = null;
+    let sirenGain = null;
+    let isSirenPlaying = false;
+    let isTestingAudio = false;
+
+    // Mobile Vibration
+    function triggerVibration(pattern = [200, 100, 200]) {
+      if ("vibrate" in navigator) {
+        try { navigator.vibrate(pattern); } catch(e) {}
+      }
+    }
+
+    /* Theme Color Switcher Logic */
+    function openThemeSelector() {
+      if (isShutdownActive) return;
+      document.getElementById('theme-modal').classList.remove('hidden');
+    }
+
+    function closeThemeSelector() {
+      document.getElementById('theme-modal').classList.add('hidden');
+    }
+
+    function applyTheme(themeName) {
+      document.body.setAttribute('data-theme', themeName);
+      
+      // Update quick chips style
+      const currentLimit = document.getElementById('limit-time').value;
+      document.querySelectorAll('.preset-chip').forEach(chip => {
+        if (chip.innerText === `${currentLimit}분`) {
+          chip.className = "preset-chip touch-active px-3.5 py-1.5 rounded-xl border text-xs font-bold theme-border theme-color-text bg-slate-800/90";
+        } else {
+          chip.className = "preset-chip touch-active px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-bold text-slate-300 hover:border-slate-500";
+        }
+      });
+
+      closeThemeSelector();
+    }
+
+    // Audio Test Mode Toggle
+    function toggleAudioTest() {
+      if (isShutdownActive) return;
+      const btnText = document.getElementById('test-sound-text');
+      const btnIcon = document.getElementById('test-sound-icon');
+
+      if (isTestingAudio) {
+        stopEmergencySirenSound();
+        isTestingAudio = false;
+        btnText.innerText = "테스트";
+        btnIcon.className = "fa-solid fa-volume-high theme-color-text";
+      } else {
+        startEmergencySirenSound(0);
+        isTestingAudio = true;
+        btnText.innerText = "정지";
+        btnIcon.className = "fa-solid fa-volume-xmark text-red-400";
+      }
+    }
+
+    // ① Urgent Emergency Siren Audio via Web Audio API
+    function startEmergencySirenSound(overtimeSeconds) {
+      if (isSirenPlaying) {
+        if (sirenOscillator && audioCtx) {
+          const speedFactor = Math.min(1 + overtimeSeconds / 15, 4.0);
+          const now = audioCtx.currentTime;
+          sirenOscillator.frequency.cancelScheduledValues(now);
+          sirenOscillator.frequency.setValueAtTime(550, now);
+          sirenOscillator.frequency.linearRampToValueAtTime(1300, now + (0.25 / speedFactor));
+          sirenOscillator.frequency.linearRampToValueAtTime(550, now + (0.5 / speedFactor));
+        }
+        return;
+      }
+
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        sirenOscillator = audioCtx.createOscillator();
+        sirenGain = audioCtx.createGain();
+
+        sirenOscillator.type = 'sawtooth';
+        
+        const now = audioCtx.currentTime;
+        sirenOscillator.frequency.setValueAtTime(550, now);
+        sirenGain.gain.setValueAtTime(0.4, now);
+
+        sirenOscillator.connect(sirenGain);
+        sirenGain.connect(audioCtx.destination);
+
+        sirenOscillator.start();
+        isSirenPlaying = true;
+      } catch (e) {
+        console.log("Audio play error", e);
+      }
+    }
+
+    function stopEmergencySirenSound() {
+      if (sirenOscillator) {
+        try {
+          sirenOscillator.stop();
+          sirenOscillator.disconnect();
+        } catch(e) {}
+        sirenOscillator = null;
+      }
+      if (audioCtx) {
+        try { audioCtx.close(); } catch(e) {}
+        audioCtx = null;
+      }
+      isSirenPlaying = false;
+    }
+
+    // ③ Synthesize Firework Celebration Sound Effect
+    function playFireworkSynthSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = ctx.sampleRate * 0.8;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(900, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.8);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.8, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        noise.start();
+      } catch (e) {}
+    }
+
+    /* Timer Controls & Presets */
+    function adjustTime(delta) {
+      if (isRunning || isShutdownActive) return;
+      const input = document.getElementById('limit-time');
+      let val = parseInt(input.value) + delta;
+      if (val < 1) val = 1;
+      if (val > 300) val = 300;
+      input.value = val;
+      document.getElementById('goal-display-text').innerText = `${val}분`;
+    }
+
+    function setPresetTime(minutes) {
+      if (isRunning || isShutdownActive) return;
+      document.getElementById('limit-time').value = minutes;
+      document.getElementById('goal-display-text').innerText = `${minutes}분`;
+
+      document.querySelectorAll('.preset-chip').forEach(chip => {
+        if (chip.innerText === `${minutes}분`) {
+          chip.className = "preset-chip touch-active px-3.5 py-1.5 rounded-xl border text-xs font-bold theme-border theme-color-text bg-slate-800/90";
+        } else {
+          chip.className = "preset-chip touch-active px-3.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-bold text-slate-300 hover:border-slate-500";
+        }
+      });
+    }
+
+    function startFocus() {
+      if (isRunning || isShutdownActive) return;
+      if (isTestingAudio) toggleAudioTest();
+      
+      isRunning = true;
+      secondsElapsed = 0;
+      
+      document.getElementById('start-btn').disabled = true;
+      document.getElementById('start-btn').classList.add('opacity-40');
+      
+      const stopBtn = document.getElementById('stop-btn');
+      stopBtn.disabled = false;
+      stopBtn.className = "touch-active flex-1 bg-red-500/20 text-red-400 border border-red-500/40 font-extrabold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 text-base";
+
+      document.getElementById('preset-container').classList.add('opacity-40', 'pointer-events-none');
+      document.getElementById('custom-time-box').classList.add('opacity-40', 'pointer-events-none');
+
+      const statusBadge = document.getElementById('status-badge');
+      statusBadge.innerText = "측정 진행 중";
+      statusBadge.className = "text-[11px] font-bold theme-color-text bg-slate-800/80 border border-slate-700 px-3 py-0.5 rounded-full mb-1";
+
+      const progressCircle = document.getElementById('progress-circle');
+      progressCircle.style.stroke = "var(--theme-primary)";
+
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function updateTimer() {
+      secondsElapsed++;
+
+      const limitMinutes = parseInt(document.getElementById('limit-time').value) || 1;
+      const limitSeconds = limitMinutes * 60;
+
+      // MM:SS Time Display
+      const mins = Math.floor(secondsElapsed / 60);
+      const secs = secondsElapsed % 60;
+      document.getElementById('time-display').innerText = 
+        `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+      // Ring Progress
+      const progressCircle = document.getElementById('progress-circle');
+      const progressRatio = Math.min(secondsElapsed / limitSeconds, 1);
+      progressCircle.style.strokeDashoffset = circumference * (1 - progressRatio);
+
+      // ② 30-Minute Interval Alert
+      if (secondsElapsed > 0 && secondsElapsed % 1800 === 0 && !isShutdownActive) {
+        showModal(`현재 스마트폰을 ${mins}분 동안 사용하고 있습니다. 공부 집중 환경으로 전환하세요!`);
+        triggerVibration([100, 50, 100]);
+      }
+
+      // ① Exceeded Limit Time Alert -> Activate SHUTDOWN & BLUR MODE
+      if (secondsElapsed > limitSeconds) {
+        const overtime = secondsElapsed - limitSeconds;
+        
+        // Trigger Full Screen Shutdown Overlay with Blur
+        if (!isShutdownActive) {
+          activateShutdownMode();
+        }
+
+        // Update Overtime readout in Overlay
+        const overMins = Math.floor(overtime / 60);
+        const overSecs = overtime % 60;
+        document.getElementById('shutdown-timer').innerText = 
+          `+${String(overMins).padStart(2, '0')}:${String(overSecs).padStart(2, '0')}`;
+
+        // Alarm Effects & Siren Sound Acceleration
+        startEmergencySirenSound(overtime);
+        if (overtime % 2 === 0) triggerVibration([300, 100, 300]);
+
+        // ④ Overuse Siren Badge Display
+        if (secondsElapsed >= limitSeconds * 1.2 || overtime >= 15) {
+          document.getElementById('siren-badge').classList.remove('hidden');
+        }
+      }
+    }
+
+    // Activate Shutdown & Screen Blur Mode
+    function activateShutdownMode() {
+      isShutdownActive = true;
+      document.body.classList.add('alarm-active');
+      document.getElementById('danger-glow').classList.remove('hidden');
+      document.getElementById('shutdown-overlay').classList.remove('hidden');
+
+      // Disable Interactive Header & Controls Behind Blur
+      document.getElementById('app-header').classList.add('pointer-events-none', 'opacity-30');
+      document.getElementById('app-footer').classList.add('pointer-events-none', 'opacity-30');
+      
+      const progressCircle = document.getElementById('progress-circle');
+      progressCircle.style.stroke = "#ef4444";
+
+      const statusBadge = document.getElementById('status-badge');
+      statusBadge.innerText = "🚨 셧다운 발동됨";
+      statusBadge.className = "text-[11px] font-extrabold text-red-400 bg-red-500/20 border border-red-500/50 px-3 py-0.5 rounded-full mb-1 animate-pulse";
+    }
+
+    // Deactivate Shutdown Mode via Emergency Unlock Button
+    function emergencyUnlockAndStop() {
+      stopFocus();
+    }
+
+    function stopFocus() {
+      if (!isRunning && !isShutdownActive) return;
+
+      clearInterval(timerInterval);
+      isRunning = false;
+      isShutdownActive = false;
+      stopEmergencySirenSound();
+
+      const limitMinutes = parseInt(document.getElementById('limit-time').value);
+      const limitSeconds = limitMinutes * 60;
+
+      // Remove Shutdown & Blur Overlay
+      document.getElementById('shutdown-overlay').classList.add('hidden');
+      document.body.classList.remove('alarm-active');
+      document.getElementById('danger-glow').classList.add('hidden');
+
+      // Restore Interactive Panels
+      document.getElementById('app-header').classList.remove('pointer-events-none', 'opacity-30');
+      document.getElementById('app-footer').classList.remove('pointer-events-none', 'opacity-30');
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('start-btn').classList.remove('opacity-40');
+      
+      const stopBtn = document.getElementById('stop-btn');
+      stopBtn.disabled = true;
+      stopBtn.className = "touch-active flex-1 bg-slate-800/80 text-slate-500 font-extrabold py-3.5 px-4 rounded-2xl border border-slate-700/50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base";
+
+      document.getElementById('preset-container').classList.remove('opacity-40', 'pointer-events-none');
+      document.getElementById('custom-time-box').classList.remove('opacity-40', 'pointer-events-none');
+
+      // Restore Ring Color
+      const progressCircle = document.getElementById('progress-circle');
+      progressCircle.style.stroke = "var(--theme-primary)";
+
+      // ③ Usage under limit -> Fireworks celebration sound & Confetti
+      if (secondsElapsed <= limitSeconds) {
+        playFireworkSynthSound();
+        triggerConfetti();
+
+        const statusBadge = document.getElementById('status-badge');
+        statusBadge.innerText = "🎉 목표 달성 성공!";
+        statusBadge.className = "text-[11px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 px-3 py-0.5 rounded-full mb-1";
+
+        setTimeout(() => {
+          alert(`🎉 축하합니다!\n목표 제한시간(${limitMinutes}분) 이내로 스마트폰 사용을 마치셨습니다.`);
+        }, 150);
+      } else {
+        const statusBadge = document.getElementById('status-badge');
+        statusBadge.innerText = "⚠️ 목표 달성 실패";
+        statusBadge.className = "text-[11px] font-bold text-rose-400 bg-rose-500/20 border border-rose-500/40 px-3 py-0.5 rounded-full mb-1";
+
+        setTimeout(() => {
+          alert(`⚠️ 제한시간을 초과했습니다.\n스마트폰을 치우고 집중을 시작하겠습니다.`);
+        }, 150);
+      }
+
+      document.getElementById('siren-badge').classList.add('hidden');
+    }
+
+    /* Modal Helper Functions */
+    function showModal(text) {
+      document.getElementById('modal-desc').innerText = text;
+      document.getElementById('notify-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('notify-modal').classList.add('hidden');
+    }
+
+    /* Confetti Burst */
+    function triggerConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 110,
+          spread: 75,
+          origin: { y: 0.7 }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
